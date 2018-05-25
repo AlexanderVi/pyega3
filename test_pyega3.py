@@ -7,6 +7,7 @@ import json
 import unittest.mock as mock
 import requests
 import responses
+from urllib import parse
 
 import pyega3.pyega3 as pyega3
 
@@ -31,6 +32,15 @@ class Pyega3Test(unittest.TestCase):
 
     @unittest.skip("not ready yet")
     def test_404(self):
+            '''
+            responses.add(
+                responses.POST, 
+                good_url, 
+                match_querystring = True,
+                json={"id_token":id_token, "access_token":access_token, "token_type":"Bearer", "expires_in": 3600}, 
+                status=200 )    
+            '''    
+        
         # with mock.patch('requests.get', mock.Mock(side_effect = lambda k:{'aurl': 'a response', 'burl' : 'b response'}.get(k, 'unhandled request %s'%k)))                
         body = "XXXX"
         returned_response = MockedErrorResponse(404, body)
@@ -61,29 +71,51 @@ class Pyega3Test(unittest.TestCase):
         good_credentials = (rand_str(), rand_str(), rand_str())
 
         url_base  =  "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"
+        '''
         url_base +=  "?grant_type=password"
         url_base +=  "&client_id=f20cd2d3-682a-4568-a53e-4262ef54c8f4"
         url_base +=  "&scope=openid"
+4        '''
         
         good_url  = url_base
-        good_url += "&client_secret="+good_credentials[2]                     
+        good_url += "?client_secret="+good_credentials[2]                     
         good_url += "&username="     +good_credentials[0]
         good_url += "&password="     +good_credentials[1]
         
 
         id_token     = rand_str()
         access_token = rand_str()        
+
         
-        responses.add(
-            responses.POST, 
-            good_url, 
-            match_querystring = True,
-            json={"id_token":id_token, "access_token":access_token, "token_type":"Bearer", "expires_in": 3600}, 
-            status=200 )    
+
+
+        def request_callback(request):
+            #payload = json.loads(request.body)                
+            #resp_body = {'value': sum(payload['numbers'])}
+            headers = {}
+            query = parse.parse_qs( request.body )
+            #query = parse.urlsplit(request.url) 
+            resp_body={"access_token": query['username'], "id_token": access_token, "token_type": "Bearer", "expires_in": 3600 }
+            return (200, headers, json.dumps(resp_body) )
+                
+        responses.add_callback(
+            responses.POST, url_base,
+            callback=request_callback,
+            content_type='application/json',
+            )        
 
         resp_token = pyega3.get_token(good_credentials)   
+        print()
+        print(resp_token)
         self.assertEqual( resp_token, access_token )
 
+        #resp = requests.post( good_url, data={"xxx":"zzzzzzzzzzzzzzzz"} )                
+        #resp_json = resp.json()
+        #print("------------------------------------------------->>>>>>>>>>>>>>>>>>>>>>>-----------------")
+        #print( json.dumps(resp_json) ) 
+        
+
+        '''
         bad_credentials = (rand_str(), rand_str(), rand_str())
         
         bad_url  = url_base
@@ -99,23 +131,13 @@ class Pyega3Test(unittest.TestCase):
         
         resp_token = pyega3.get_token(bad_credentials)   
         self.assertEqual( resp_token, access_token )
+        '''
 
 
         
 
         '''
-        def request_callback(request):
-                #payload = json.loads(request.body)                
-                #resp_body = {'value': sum(payload['numbers'])}
-                headers = {}
-                resp_body={"id_token": id_token, "access_token": access_token, "token_type": "Bearer", "expires_in": 3600 }
-                return (200, headers, json.dumps(resp_body) )
         
-        responses.add_callback(
-                responses.POST, url,
-                callback=request_callback,
-                content_type='application/json',
-            )        
         #resp = requests.get( url )
         ''' 
         #resp_json = resp.json()

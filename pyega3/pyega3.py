@@ -47,6 +47,7 @@ def get_token(credentials):
         
     r = requests.post( url, headers=headers, data=data )
     if(debug): print(r)
+    #r.raise_for_status()
     
     reply = r.json()
     print_debug_info(url, reply)
@@ -66,6 +67,8 @@ def api_list_authorized_datasets(token):
     
     url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets"
     r = requests.get(url, headers = headers)
+    r.raise_for_status()
+    
     reply = r.json()
 
     print_debug_info(url,reply)
@@ -308,7 +311,7 @@ def print_debug_info(url, reply_json, *args):
     if(not debug): return
     
     print("Request URL : {}".format(url))
-    if reply_json is not None: print("Response    :\n %.200s" % json.dumps(reply_json, indent=4) )
+    if reply_json is not None: print("Response    :\n %.1200s" % json.dumps(reply_json, indent=4) )
 
     for a in args: print(a)
 
