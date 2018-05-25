@@ -3,6 +3,7 @@ import tempfile
 import random
 import string
 import json
+import sys
 
 import unittest.mock as mock
 import requests
@@ -32,14 +33,15 @@ class Pyega3Test(unittest.TestCase):
 
     @unittest.skip("not ready yet")
     def test_404(self):
-            '''
-            responses.add(
-                responses.POST, 
-                good_url, 
-                match_querystring = True,
-                json={"id_token":id_token, "access_token":access_token, "token_type":"Bearer", "expires_in": 3600}, 
-                status=200 )    
-            '''    
+        '''
+        responses.add(
+            responses.POST,
+            good_url,
+            match_querystring = True,
+            json={"id_token":id_token, "access_token":access_token,
+                "token_type":"Bearer", "expires_in": 3600},
+            status=200 )
+        '''
         
         # with mock.patch('requests.get', mock.Mock(side_effect = lambda k:{'aurl': 'a response', 'burl' : 'b response'}.get(k, 'unhandled request %s'%k)))                
         body = "XXXX"
@@ -53,6 +55,7 @@ class Pyega3Test(unittest.TestCase):
                 else:
                     self.assertFalse(True)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "test does not work on Windows")
     def test_load_credentials(self):
         dict={"username":rand_str(),"password":rand_str(),"key":rand_str(),"client_secret":rand_str()}
         with tempfile.NamedTemporaryFile(mode='w') as tf:
@@ -65,90 +68,35 @@ class Pyega3Test(unittest.TestCase):
             self.assertEqual(result[2]   , dict["client_secret"] )
             self.assertEqual(result[3]   , dict["key"]           )    
 
-
     @responses.activate    
-    def test_get_token(self):
-        good_credentials = (rand_str(), rand_str(), rand_str())
-
-        url_base  =  "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"
-        '''
-        url_base +=  "?grant_type=password"
-        url_base +=  "&client_id=f20cd2d3-682a-4568-a53e-4262ef54c8f4"
-        url_base +=  "&scope=openid"
-4        '''
-        
-        good_url  = url_base
-        good_url += "?client_secret="+good_credentials[2]                     
-        good_url += "&username="     +good_credentials[0]
-        good_url += "&password="     +good_credentials[1]
-        
+    def test_get_token(self):        
+        url  =  "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"
 
         id_token     = rand_str()
-        access_token = rand_str()        
+        access_token = rand_str()          
 
-        
-
+        good_credentials = (rand_str(), rand_str(), rand_str())
 
         def request_callback(request):
-            #payload = json.loads(request.body)                
-            #resp_body = {'value': sum(payload['numbers'])}
-            headers = {}
+            
             query = parse.parse_qs( request.body )
-            #query = parse.urlsplit(request.url) 
-            resp_body={"access_token": query['username'], "id_token": access_token, "token_type": "Bearer", "expires_in": 3600 }
-            return (200, headers, json.dumps(resp_body) )
+            if query['username'][0] == good_credentials[0] and query['password'][0] == good_credentials[1]:
+                return ( 200, {}, json.dumps({"access_token": access_token, "id_token": id_token, "token_type": "Bearer", "expires_in": 3600 }) )
+            else:
+                return ( 400, {}, json.dumps({"error_description": "Bad credentials","error": "invalid_grant"}) )
                 
         responses.add_callback(
-            responses.POST, url_base,
+            responses.POST, url,
             callback=request_callback,
             content_type='application/json',
             )        
 
-        resp_token = pyega3.get_token(good_credentials)   
-        print()
-        print(resp_token)
+        resp_token = pyega3.get_token(good_credentials)
         self.assertEqual( resp_token, access_token )
 
-        #resp = requests.post( good_url, data={"xxx":"zzzzzzzzzzzzzzzz"} )                
-        #resp_json = resp.json()
-        #print("------------------------------------------------->>>>>>>>>>>>>>>>>>>>>>>-----------------")
-        #print( json.dumps(resp_json) ) 
-        
-
-        '''
         bad_credentials = (rand_str(), rand_str(), rand_str())
-        
-        bad_url  = url_base
-        bad_url += "&client_secret="+bad_credentials[2] 
-        bad_url += "&username="     +bad_credentials[0]
-        bad_url += "&password="     +bad_credentials[1]               
-                
-        responses.add(
-            responses.POST, 
-            bad_url, 
-            json={"error": "invalid_grant","error_description": "Bad credentials"},
-            status=400 )    
-        
-        resp_token = pyega3.get_token(bad_credentials)   
-        self.assertEqual( resp_token, access_token )
-        '''
-
-
-        
-
-        '''
-        
-        #resp = requests.get( url )
-        ''' 
-        #resp_json = resp.json()
-        #print("------------------------------------------------->>>>>>>>>>>>>>>>>>>>>>>-----------------")
-        #print( json.dumps(resp_json) )         
-                
-        #self.assertEqual( resp_json["id_token"]    ,  id_token     )
-        #self.assertEqual( resp_json["access_token"],  access_token )
-        #self.assertEqual( "token_type"             ,  "Bearer"     )
-        #self.assertEqual( "expires_in"             ,  "3600"       )       
-        
+        with self.assertRaises(SystemExit):
+            pyega3.get_token(bad_credentials)                                
                     
 if __name__ == '__main__':
     unittest.main()
