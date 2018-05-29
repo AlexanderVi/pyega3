@@ -92,6 +92,7 @@ def api_list_files_in_dataset(token, dataset):
         sys.exit("Dataset '{}' is not in the list of your authorized datasets.".format(dataset))        
     
     r = requests.get(url, headers = headers)
+    r.raise_for_status()
     if(debug): print(r)
     
     reply = r.json()

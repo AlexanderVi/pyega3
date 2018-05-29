@@ -98,7 +98,6 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(SystemExit):
             pyega3.get_token(bad_credentials)                                
 
-    
     @responses.activate    
     def test_api_list_authorized_datasets(self):        
         url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets"
@@ -116,7 +115,7 @@ class Pyega3Test(unittest.TestCase):
             responses.GET, url,
             callback=request_callback,
             content_type='application/json',
-            )        
+            )                
 
         resp_json = pyega3.api_list_authorized_datasets(good_token)
         self.assertEqual( len(resp_json), 3 )
@@ -127,6 +126,68 @@ class Pyega3Test(unittest.TestCase):
         bad_token = rand_str()
         with self.assertRaises(requests.exceptions.HTTPError):
             pyega3.api_list_authorized_datasets(bad_token)
+
+    
+    @responses.activate    
+    def test_api_list_files_in_dataset(self): 
+
+        dataset = "EGAD00000000001"
+
+        responses.add(
+                responses.GET, 
+                "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets",
+                json=json.dumps([dataset]), status=200)
+
+        url_files = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets/{}/files".format(dataset)        
+
+        files = [
+        {
+            "checksum": "3b89b96387db5199fef6ba613f70e27c",
+            "datasetId": dataset,
+            "fileStatus": "available",
+            "fileId": "EGAF00000000001",
+            "checksumType": "MD5",
+            "fileSize": 4804928,
+            "fileName": "EGAZ00000000001/ENCFF000001.bam"
+        },
+        {
+            "checksum": "b8ae14d5d1f717ab17d45e8fc36946a0",
+            "datasetId": dataset,
+            "fileStatus": "available",
+            "fileId": "EGAF00000000002",
+            "checksumType": "MD5",
+            "fileSize": 5991400,
+            "fileName": "EGAZ00000000002/ENCFF000002.bam"
+        } ]
+
+        good_token = rand_str()
+
+        def request_callback(request):   
+            auth_hdr = request.headers['Authorization']
+            if auth_hdr is not None and auth_hdr == 'Bearer ' + good_token:
+                return ( 200, {}, json.dumps(files) )
+            else:
+                return ( 400, {}, json.dumps({"error_description": "invalid token"}) )
+                
+        responses.add_callback(
+            responses.GET, url_files,
+            callback=request_callback,
+            content_type='application/json',
+            )        
+
+        resp_json = pyega3.api_list_files_in_dataset(good_token, dataset)
+        
+        self.assertEqual( len(resp_json), 2 )
+        self.assertEqual( resp_json[0], files[0] )
+        self.assertEqual( resp_json[1], files[1] )
+
+        bad_token = rand_str()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            pyega3.api_list_files_in_dataset(bad_token, dataset)
+
+        bad_dataset  = rand_str()
+        with self.assertRaises(SystemExit):
+            pyega3.api_list_files_in_dataset(good_token, bad_dataset)
                     
 if __name__ == '__main__':
     unittest.main()
