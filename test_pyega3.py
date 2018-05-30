@@ -102,12 +102,13 @@ class Pyega3Test(unittest.TestCase):
     def test_api_list_authorized_datasets(self):        
         url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets"
 
-        good_token     = rand_str()       
+        good_token = rand_str()       
+        datasets = ["EGAD00000000001", "EGAD00000000002","EGAD00000000003"]
 
         def request_callback(request):   
             auth_hdr = request.headers['Authorization']
             if auth_hdr is not None and auth_hdr == 'Bearer ' + good_token:
-                return ( 200, {}, json.dumps(["EGAD00000000001", "EGAD00000000002","EGAD00000000003"]) )
+                return ( 200, {}, json.dumps(datasets) )
             else:
                 return ( 400, {}, json.dumps({"error_description": "invalid token"}) )
                 
@@ -119,9 +120,9 @@ class Pyega3Test(unittest.TestCase):
 
         resp_json = pyega3.api_list_authorized_datasets(good_token)
         self.assertEqual( len(resp_json), 3 )
-        self.assertEqual( resp_json[0], "EGAD00000000001" )
-        self.assertEqual( resp_json[1], "EGAD00000000002" )
-        self.assertEqual( resp_json[2], "EGAD00000000003" )
+        self.assertEqual( resp_json[0], datasets[0] )
+        self.assertEqual( resp_json[1], datasets[1] )
+        self.assertEqual( resp_json[2], datasets[2] )
 
         bad_token = rand_str()
         with self.assertRaises(requests.exceptions.HTTPError):
@@ -190,4 +191,4 @@ class Pyega3Test(unittest.TestCase):
             pyega3.api_list_files_in_dataset(good_token, bad_dataset)
                     
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(exit=False)
