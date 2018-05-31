@@ -1,5 +1,6 @@
-import unittest
-import tempfile
+import unittest 
+from unittest.mock import patch, mock_open
+
 import random
 import string
 import json
@@ -42,8 +43,9 @@ class Pyega3Test(unittest.TestCase):
                 "token_type":"Bearer", "expires_in": 3600},
             status=200 )
         '''
-        
-        # with mock.patch('requests.get', mock.Mock(side_effect = lambda k:{'aurl': 'a response', 'burl' : 'b response'}.get(k, 'unhandled request %s'%k)))                
+
+        # with mock.patch('requests.get', mock.Mock(side_effect = lambda k:{'aurl': 'a response', 
+        # 'burl' : 'b response'}.get(k, 'unhandled request %s'%k)))
         body = "XXXX"
         returned_response = MockedErrorResponse(404, body)
         with mock.patch("requests.get", return_value=returned_response):
@@ -55,18 +57,17 @@ class Pyega3Test(unittest.TestCase):
                 else:
                     self.assertFalse(True)
 
-    @unittest.skipIf(sys.platform.startswith("win"), "test does not work on Windows")
     def test_load_credentials(self):
         dict={"username":rand_str(),"password":rand_str(),"key":rand_str(),"client_secret":rand_str()}
-        with tempfile.NamedTemporaryFile(mode='w') as tf:
-            json.dump(dict,tf)
-            tf.flush()
-            result = pyega3.load_credentials(tf.name)            
-            self.assertEqual(len(result) , 4                     )
-            self.assertEqual(result[0]   , dict["username"]      )
-            self.assertEqual(result[1]   , dict["password"]      )
-            self.assertEqual(result[2]   , dict["client_secret"] )
-            self.assertEqual(result[3]   , dict["key"]           )    
+        with mock.patch('os.path.exists') as m:
+            m.return_value = True
+            with patch( "builtins.open", mock_open(read_data=json.dumps(dict)) ) as mock_file:
+                result = pyega3.load_credentials("credentials.json")
+                self.assertEqual(len(result) , 4                     )
+                self.assertEqual(result[0]   , dict["username"]      )
+                self.assertEqual(result[1]   , dict["password"]      )
+                self.assertEqual(result[2]   , dict["client_secret"] )
+                self.assertEqual(result[3]   , dict["key"]           )    
 
     @responses.activate    
     def test_get_token(self):        
@@ -195,6 +196,46 @@ class Pyega3Test(unittest.TestCase):
 
         good_file_id = "EGAF00000000001"
         file_size    = 4804928
+        file_name    = "EGAZ00000000001/ENCFF000001.bam"
+        check_sum    = "3b89b96387db5199fef6ba613f70e27c"
+
+        good_token = rand_str()       
+
+        def request_callback(request):   
+            auth_hdr = request.headers['Authorization']
+            if auth_hdr is not None and auth_hdr == 'Bearer ' + good_token:
+                return ( 200, {}, json.dumps({"fileName": file_name, "fileSize": file_size, "checksum": check_sum}) )
+            else:
+                return ( 400, {}, json.dumps({"error_description": "invalid token"}) )
+                
+        responses.add_callback(
+            responses.GET, 
+            "https://ega.ebi.ac.uk:8051/elixir/data/metadata/files/{}".format(good_file_id),
+            callback=request_callback,
+            content_type='application/json',
+            )                
+
+        rv = pyega3.get_file_name_size_md5(good_token, good_file_id)
+        self.assertEqual( len(rv), 3 )
+        self.assertEqual( rv[0], file_name )
+        self.assertEqual( rv[1], file_size )
+        self.assertEqual( rv[2], check_sum )
+
+        bad_token = rand_str()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            pyega3.get_file_name_size_md5(bad_token, good_file_id)
+
+        bad_file_id = "EGAF00000000000"
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            pyega3.get_file_name_size_md5(good_token, bad_file_id)
+  
+    @unittest.skip
+    @responses.activate    
+    def test_download_file_slice(self):      
+
+        url = "http://some_url"
+
+        file_length = random.randint(1, )
         file_name    = "EGAZ00000000001/ENCFF000001.bam"
         check_sum    = "3b89b96387db5199fef6ba613f70e27c"
 
