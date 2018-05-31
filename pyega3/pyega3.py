@@ -137,6 +137,7 @@ def get_file_name_size_md5(token,file_id):
     url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/files/{}".format(file_id)
                 
     r = requests.get(url, headers = headers)
+    r.raise_for_status()
     res = r.json()
 
     print_debug_info(url,res)

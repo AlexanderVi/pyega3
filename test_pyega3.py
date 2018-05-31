@@ -189,6 +189,45 @@ class Pyega3Test(unittest.TestCase):
         bad_dataset  = rand_str()
         with self.assertRaises(SystemExit):
             pyega3.api_list_files_in_dataset(good_token, bad_dataset)
+
+    @responses.activate    
+    def test_get_file_name_size_md5(self):      
+
+        good_file_id = "EGAF00000000001"
+        file_size    = 4804928
+        file_name    = "EGAZ00000000001/ENCFF000001.bam"
+        check_sum    = "3b89b96387db5199fef6ba613f70e27c"
+
+        good_token = rand_str()       
+
+        def request_callback(request):   
+            auth_hdr = request.headers['Authorization']
+            if auth_hdr is not None and auth_hdr == 'Bearer ' + good_token:
+                return ( 200, {}, json.dumps({"fileName": file_name, "fileSize": file_size, "checksum": check_sum}) )
+            else:
+                return ( 400, {}, json.dumps({"error_description": "invalid token"}) )
+                
+        responses.add_callback(
+            responses.GET, 
+            "https://ega.ebi.ac.uk:8051/elixir/data/metadata/files/{}".format(good_file_id),
+            callback=request_callback,
+            content_type='application/json',
+            )                
+
+        rv = pyega3.get_file_name_size_md5(good_token, good_file_id)
+        self.assertEqual( len(rv), 3 )
+        self.assertEqual( rv[0], file_name )
+        self.assertEqual( rv[1], file_size )
+        self.assertEqual( rv[2], check_sum )
+
+        bad_token = rand_str()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            pyega3.get_file_name_size_md5(bad_token, good_file_id)
+
+        bad_file_id = "EGAF00000000000"
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            pyega3.get_file_name_size_md5(good_token, bad_file_id)
+
                     
 if __name__ == '__main__':
     unittest.main(exit=False)
