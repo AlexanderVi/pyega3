@@ -1,7 +1,7 @@
 
+import os
 import sys
 import json
-import time
 import random
 import string
 import requests
@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 from urllib import parse
-# from psutil import virtual_memory
+from psutil import virtual_memory
 
 import struct
 import itertools
@@ -23,62 +23,7 @@ def random_string(length):
 def rand_str(min_len=6, max_len=127):
     return random_string(random.randint(1, max_len))
 
-def rand_bytes(length, seed=None):
-    if seed: random.seed(seed)
-    return random.getrandbits(length*8).to_bytes(length, 'little')
-
-# def randbytes(n,_struct8k=struct.Struct("!1000Q").pack_into):
-#     if n<8000:
-#         longs=(n+7)//8
-#         return struct.pack("!%iQ"%longs,*map(
-#             random.getrandbits,itertools.repeat(64,longs)))[:n]
-#     data=bytearray(n);
-#     for offset in range(0,n-7999,8000):
-#         _struct8k(data,offset,
-#             *map(random.getrandbits,itertools.repeat(64,1000)))
-#     offset+=8000
-#     data[offset:]=randbytes(n-offset)
-#     return data
-
-class MockedErrorResponse(object):
-    """
-    Mocked response object for requests.
-    """
-    def __init__(self, status_code, body):
-        self.status_code = status_code
-        self.text = body
-
-    def raise_for_status(self):
-        raise requests.HTTPError()
-
-
 class Pyega3Test(unittest.TestCase):
-
-    @unittest.skip("not ready yet")
-    def test_404(self):
-        '''
-        responses.add(
-            responses.POST,
-            good_url,
-            match_querystring = True,
-            json={"id_token":id_token, "access_token":access_token,
-                "token_type":"Bearer", "expires_in": 3600},
-            status=200 )
-        '''
-
-        # with mock.patch('requests.get', mock.Mock(side_effect = lambda k:{'aurl': 'a response', 
-        # 'burl' : 'b response'}.get(k, 'unhandled request %s'%k)))
-        body = "XXXX"
-        returned_response = MockedErrorResponse(404, body)
-        with mock.patch("requests.get", return_value=returned_response):
-            with tempfile.TemporaryFile("wb+") as f:
-                try:
-                    pyega3.get("http://some_url", f)
-                except Exception as e:
-                    self.assertIn(body, str(e))
-                else:
-                    self.assertFalse(True)
-
     def test_load_credentials(self):
         dict={"username":rand_str(),"password":rand_str(),"key":rand_str(),"client_secret":rand_str()}
         with mock.patch('os.path.exists') as m:
@@ -258,16 +203,15 @@ class Pyega3Test(unittest.TestCase):
     @responses.activate    
     def test_download_file_slice(self):
 
-        seed = time.time()
-        url = "https://test_url"
+        url = "https://test_server_url"
         good_token = rand_str() 
-        # mem = virtual_memory().available
-        mem = int(128*1024*1024)
 
-        # file_length = random.randint(1, mem)
-        file_length = mem
-        start_pos   = random.randint(0,file_length)
-        file_name    = "EGAZ00000000001/ENCFF000001.bam"
+        mem             = virtual_memory().available
+        file_length     = random.randint(1, mem//4)
+        start_pos       = random.randint(0,file_length)
+        slice_length    = random.randint(0,file_length-start_pos)
+        file_name       = "EGAZ00000000001/ENCFF000001.bam"
+        file_contents   = os.urandom(file_length)
 
         def parse_ranges(s):
             return tuple(map(int,re.match(r'^bytes=(\d+)-(\d+)$', s).groups()))
@@ -279,11 +223,7 @@ class Pyega3Test(unittest.TestCase):
 
             start, end = parse_ranges( request.headers['Range'] )
             self.assertLess(start,end)                              
-            # return ( 200, {}, bytes(n%256 for n in range(start,end+1)) )            
-            # import os
-            # return ( 200, {}, os.urandom(end-start+1) )
-            return ( 200, {}, rand_bytes(end-start+1, seed) )
-                
+            return ( 200, {}, file_contents[start:end+1] )
                 
         responses.add_callback(
             responses.GET, 
@@ -291,29 +231,21 @@ class Pyega3Test(unittest.TestCase):
             callback=request_callback
             )                
         
-        self.written_bytes = 0
-        expected_bytes = rand_bytes(file_length,seed)
+        self.written_bytes = 0        
         def mock_write(buf):
             buf_len = len(buf) 
-            expected = expected_bytes[self.written_bytes:self.written_bytes+buf_len]
-            self.assertEqual( expected, buf )
-               
-            # for i in range(0, buf_len):
-            #     expected_byte = expected_bytes[self.written_bytes+i]
-            #     self.assertEqual( expected_byte, buf[i] )
+            expected_buf = file_contents[start_pos+self.written_bytes:start_pos+self.written_bytes+buf_len]
+            self.assertEqual( expected_buf, buf )               
             self.written_bytes += buf_len
         
         m_open = mock.mock_open()
         with mock.patch( "builtins.open", m_open, create=True ):  
             m_open().write.side_effect = mock_write
-            pyega3.download_file_slice(url, good_token, file_name, start_pos, file_length)
-        
-        self.assertEqual( file_length, self.written_bytes )
+            pyega3.download_file_slice(url, good_token, file_name, start_pos, slice_length)        
+            self.assertEqual( slice_length, self.written_bytes )
 
-        fname_on_disk = file_name + '-from-'+str(start_pos)+'-len-'+str(file_length)+'.slice'
+        fname_on_disk = file_name + '-from-'+str(start_pos)+'-len-'+str(slice_length)+'.slice'
         m_open.assert_called_with(fname_on_disk, 'ba')
-        # print(str(m_open.mock_calls))
-
                     
 if __name__ == '__main__':
     unittest.main(exit=False)
