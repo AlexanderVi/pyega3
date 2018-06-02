@@ -20,16 +20,16 @@ def load_credentials(filepath):
     """Load credentials for EMBL/EBI EGA from specified file"""
     filepath = os.path.expanduser(filepath)
     if not os.path.exists(filepath): sys.exit("{} does not exist".format(filepath))
-        
+
     try:
         with open(filepath) as f:
             creds = json.load(f)
         if 'username' not in creds or 'password' not in creds or 'client_secret' not in creds:
             sys.exit("{} does not contain either or any of 'username', 'password', or 'client_secret' fields".format(filepath))
     except ValueError:
-            sys.exit("invalid JSON file")
+        sys.exit("invalid JSON file")
 
-    return ( creds['username'], creds['password'], creds['client_secret'], creds.get('key') ) 
+    return (creds['username'], creds['password'], creds['client_secret'], creds.get('key'))
 
 def get_token(credentials):
     url = "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"    
@@ -43,7 +43,7 @@ def get_token(credentials):
              "client_secret": client_secret,
              "username"     : username,
              "password"     : password
-    }
+            }
         
     r = requests.post( url, headers=headers, data=data )
     if(debug): print(r)
@@ -65,7 +65,7 @@ def api_list_authorized_datasets(token):
     headers = {'Accept':'application/json', 'Authorization': 'Bearer {}'.format(token)} 
     
     url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets"
-    r = requests.get(url, headers = headers)
+    r = requests.get(url, headers=headers)
     r.raise_for_status()
     
     reply = r.json()
@@ -132,7 +132,7 @@ def pretty_print_files_in_dataset(reply, dataset):
     print( "Total dataset size = %.2f GB " % (sum(r['fileSize'] for r in reply )/(1024*1024*1024.0)) )
         
 
-def get_file_name_size_md5(token,file_id):
+def get_file_name_size_md5(token, file_id):
     headers = {'Accept':'application/json', 'Authorization': 'Bearer {}'.format(token)}         
     url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/files/{}".format(file_id)
                 
@@ -148,7 +148,7 @@ def get_file_name_size_md5(token,file_id):
     return ( res['fileName'], res['fileSize'], res['checksum'] )
 
 
-def download_file_slice( url, token, file_name, start_pos, length, pbar ):
+def download_file_slice( url, token, file_name, start_pos, length, pbar=None ):
 
     CHUNK_SIZE = 32*1024
 
@@ -165,7 +165,7 @@ def download_file_slice( url, token, file_name, start_pos, length, pbar ):
         
         if( existing_size > length ): existing_size=0; file_out.seek(0, 0); file_out.truncate()            
         
-        pbar.update( existing_size )
+        if pbar: pbar.update( existing_size )
 
         if( existing_size == length ): return file_name
 
@@ -181,7 +181,7 @@ def download_file_slice( url, token, file_name, start_pos, length, pbar ):
 
         for chunk in r.iter_content(CHUNK_SIZE):
             file_out.write(chunk)
-            pbar.update(len(chunk))
+            if pbar: pbar.update(len(chunk))
 
     return file_name
 
