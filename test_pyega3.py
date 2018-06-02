@@ -208,9 +208,9 @@ class Pyega3Test(unittest.TestCase):
 
         mem             = virtual_memory().available
         file_length     = random.randint(1, mem//4)
-        start_pos       = random.randint(0,file_length)
-        slice_length    = random.randint(0,file_length-start_pos)
-        file_name       = "EGAZ00000000001/ENCFF000001.bam"
+        slice_start     = random.randint(0,file_length)
+        slice_length    = random.randint(0,file_length-slice_start)
+        file_name       = rand_str()
         file_contents   = os.urandom(file_length)
 
         def parse_ranges(s):
@@ -234,17 +234,17 @@ class Pyega3Test(unittest.TestCase):
         self.written_bytes = 0        
         def mock_write(buf):
             buf_len = len(buf) 
-            expected_buf = file_contents[start_pos+self.written_bytes:start_pos+self.written_bytes+buf_len]
+            expected_buf = file_contents[slice_start+self.written_bytes:slice_start+self.written_bytes+buf_len]
             self.assertEqual( expected_buf, buf )               
             self.written_bytes += buf_len
         
         m_open = mock.mock_open()
         with mock.patch( "builtins.open", m_open, create=True ):  
             m_open().write.side_effect = mock_write
-            pyega3.download_file_slice(url, good_token, file_name, start_pos, slice_length)        
+            pyega3.download_file_slice(url, good_token, file_name, slice_start, slice_length)        
             self.assertEqual( slice_length, self.written_bytes )
 
-        fname_on_disk = file_name + '-from-'+str(start_pos)+'-len-'+str(slice_length)+'.slice'
+        fname_on_disk = file_name + '-from-'+str(slice_start)+'-len-'+str(slice_length)+'.slice'
         m_open.assert_called_with(fname_on_disk, 'ba')
                     
 if __name__ == '__main__':
