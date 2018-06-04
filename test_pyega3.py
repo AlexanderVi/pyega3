@@ -199,11 +199,10 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(requests.exceptions.ConnectionError):
             pyega3.get_file_name_size_md5(good_token, bad_file_id)
   
-    # @unittest.skip
     @responses.activate    
     def test_download_file_slice(self):
 
-        url = "https://test_server_url"
+        good_url = "https://good_test_server_url"
         good_token = rand_str() 
 
         mem             = virtual_memory().available
@@ -227,7 +226,7 @@ class Pyega3Test(unittest.TestCase):
                 
         responses.add_callback(
             responses.GET, 
-            url,
+            good_url,
             callback=request_callback
             )                
         
@@ -241,11 +240,78 @@ class Pyega3Test(unittest.TestCase):
         m_open = mock.mock_open()
         with mock.patch( "builtins.open", m_open, create=True ):  
             m_open().write.side_effect = mock_write
-            pyega3.download_file_slice(url, good_token, file_name, slice_start, slice_length)        
+            pyega3.download_file_slice(good_url, good_token, file_name, slice_start, slice_length)        
             self.assertEqual( slice_length, self.written_bytes )
 
         fname_on_disk = file_name + '-from-'+str(slice_start)+'-len-'+str(slice_length)+'.slice'
         m_open.assert_called_with(fname_on_disk, 'ba')
+
+        bad_token = rand_str()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            pyega3.download_file_slice(good_url, bad_token, file_name, slice_start, slice_length)
+
+        bad_url = "https://bad_test_server_url"
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            pyega3.download_file_slice(bad_url, good_token, file_name, slice_start, slice_length)
+
+
+    @responses.activate    
+    @mock.patch('os.remove')
+    def test_merge_bin_files_on_disk(self, mocked_remove):
+        
+        mem = virtual_memory().available        
+        files_to_merge = {
+            'f1.bin' : os.urandom(random.randint(1, mem//8)), 
+            'f2.bin' : os.urandom(random.randint(1, mem//8)), 
+            'f3.bin' : os.urandom(random.randint(1, mem//8)), 
+        }
+        target_file_name = "merged.file"
+
+        merged_bytes = bytearray()
+        def mock_write(buf):
+            merged_bytes.extend(buf)
+
+        def open_wrapper(filename, mode):            
+
+            if filename == target_file_name:
+                file_object = mock.mock_open().return_value
+                file_object.write.side_effect = mock_write
+                return file_object                
+
+            content = files_to_merge[filename] 
+            length = len(content)
+            buf_size = 65536
+
+            file_object = mock.mock_open(read_data=content).return_value
+            file_object.__iter__.return_value = [content[i:min(i+buf_size,length)] for i in range(0,length,buf_size)]
+
+            return file_object
+        
+        
+        for f in files_to_merge:      
+            open_patch = mock.patch('builtins.open', new=open_wrapper)
+            open_patch.start()
+        
+        # m_open = mock.mock_open()
+        # with mock.patch( "builtins.open", m_open, create=True ):  
+            # m_open().write.side_effect = mock_write            
+    
+    
+        pyega3.merge_bin_files_on_disk(target_file_name, files_to_merge)
+
+        os_remove_calls =[]
+        for f in files_to_merge.keys():
+            os_remove_calls.append( mock.call(f))
+        mocked_remove.assert_has_calls(os_remove_calls) 
+
+        verified_bytes = 0
+        for f_content in files_to_merge.values():
+            f_len = len(f_content)
+            self.assertEqual( f_content, merged_bytes[verified_bytes:verified_bytes+f_len] )
+            verified_bytes += f_len           
+
+        self.assertEqual( verified_bytes, len(merged_bytes) )
+        
                     
 if __name__ == '__main__':
     unittest.main(exit=False)
