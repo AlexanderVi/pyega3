@@ -159,26 +159,23 @@ def download_file_slice( url, token, file_name, start_pos, length, pbar=None ):
 
     file_name += '-from-'+str(start_pos)+'-len-'+str(length)+'.slice'
     
+    existing_size = os.stat(file_name).st_size if os.path.exists(file_name) else 0
+    if( existing_size > length ): os.remove(file_name)        
+    if pbar: pbar.update( existing_size )
+
+    if( existing_size == length ): return file_name
+
+    headers = {}
+    headers['Authorization'] = 'Bearer {}'.format(token)        
+    headers['Range'] = 'bytes={}-{}'.format(start_pos+existing_size,start_pos+length-1)
+
+    print_debug_info( url, None, "Request headers: {}".format(headers) )
+    r = requests.get(url, headers=headers, stream=True)               
+    print_debug_info( url, None, "Response headers: {}".format(r.headers) )
+
+    r.raise_for_status()           
+
     with open(file_name, 'ba') as file_out:
-
-        existing_size = os.fstat(file_out.fileno()).st_size
-        
-        if( existing_size > length ): existing_size=0; file_out.seek(0, 0); file_out.truncate()            
-        
-        if pbar: pbar.update( existing_size )
-
-        if( existing_size == length ): return file_name
-
-        headers = {}
-        headers['Authorization'] = 'Bearer {}'.format(token)        
-        headers['Range'] = 'bytes={}-{}'.format(start_pos+existing_size,start_pos+length-1)
-
-        print_debug_info( url, None, "Request headers: {}".format(headers) )
-        r = requests.get(url, headers=headers, stream=True)               
-        print_debug_info( url, None, "Response headers: {}".format(r.headers) )
-
-        r.raise_for_status()           
-
         for chunk in r.iter_content(CHUNK_SIZE):
             file_out.write(chunk)
             if pbar: pbar.update(len(chunk))
