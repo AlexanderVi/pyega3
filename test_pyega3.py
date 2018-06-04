@@ -271,43 +271,30 @@ class Pyega3Test(unittest.TestCase):
         def mock_write(buf):
             merged_bytes.extend(buf)
 
-        def open_wrapper(filename, mode):            
-
+        def open_wrapper(filename, mode):       
             if filename == target_file_name:
                 file_object = mock.mock_open().return_value
                 file_object.write.side_effect = mock_write
                 return file_object                
-
             content = files_to_merge[filename] 
             length = len(content)
             buf_size = 65536
-
             file_object = mock.mock_open(read_data=content).return_value
             file_object.__iter__.return_value = [content[i:min(i+buf_size,length)] for i in range(0,length,buf_size)]
-
-            return file_object
-        
+            return file_object        
         
         for f in files_to_merge:      
             open_patch = mock.patch('builtins.open', new=open_wrapper)
             open_patch.start()
         
-        # m_open = mock.mock_open()
-        # with mock.patch( "builtins.open", m_open, create=True ):  
-            # m_open().write.side_effect = mock_write            
-    
-    
         pyega3.merge_bin_files_on_disk(target_file_name, files_to_merge)
 
-        os_remove_calls =[]
-        for f in files_to_merge.keys():
-            os_remove_calls.append( mock.call(f))
-        mocked_remove.assert_has_calls(os_remove_calls) 
+        mocked_remove.assert_has_calls( [mock.call(f) for f in files_to_merge.keys()] )
 
         verified_bytes = 0
         for f_content in files_to_merge.values():
             f_len = len(f_content)
-            self.assertEqual( f_content, merged_bytes[verified_bytes:verified_bytes+f_len] )
+            self.assertEqual( f_content, merged_bytes[ verified_bytes : verified_bytes+f_len ] )
             verified_bytes += f_len           
 
         self.assertEqual( verified_bytes, len(merged_bytes) )
