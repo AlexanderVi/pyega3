@@ -255,10 +255,8 @@ class Pyega3Test(unittest.TestCase):
             pyega3.download_file_slice(bad_url, good_token, file_name, slice_start, slice_length)
 
 
-    @responses.activate    
     @mock.patch('os.remove')
-    def test_merge_bin_files_on_disk(self, mocked_remove):
-        
+    def test_merge_bin_files_on_disk(self, mocked_remove):        
         mem = virtual_memory().available        
         files_to_merge = {
             'f1.bin' : os.urandom(random.randint(1, mem//8)), 
@@ -268,8 +266,7 @@ class Pyega3Test(unittest.TestCase):
         target_file_name = "merged.file"
 
         merged_bytes = bytearray()
-        def mock_write(buf):
-            merged_bytes.extend(buf)
+        def mock_write(buf): merged_bytes.extend(buf)
 
         def open_wrapper(filename, mode):       
             if filename == target_file_name:
@@ -298,6 +295,25 @@ class Pyega3Test(unittest.TestCase):
             verified_bytes += f_len           
 
         self.assertEqual( verified_bytes, len(merged_bytes) )
+
+    def test_md5(self):
+
+        test_list = [
+                ("d41d8cd98f00b204e9800998ecf8427e", b""),
+                ("0cc175b9c0f1b6a831c399e269772661", b"a"),
+                ("900150983cd24fb0d6963f7d28e17f72", b"abc"),
+                ("f96b697d7cb7938d525a2f31aaf161d0", b"message digest"),
+                ("c3fcd3d76192e4007dfb496cca67e13b", b"abcdefghijklmnopqrstuvwxyz"),
+                ("d174ab98d277d9f5a5611c2c9f419d9f", b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
+                ("57edf4a22be3c955ac49da2e2107b67a", b"12345678901234567890123456789012345678901234567890123456789012345678901234567890")
+        ]
+
+        for md5, data in test_list:
+            m_open = mock.mock_open(read_data=data)
+            with mock.patch( "builtins.open", m_open ):                
+                credentials_file = "credentials.json"
+                result = pyega3.md5(rand_str())
+                self.assertEqual(md5, result)
         
                     
 if __name__ == '__main__':
