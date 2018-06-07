@@ -25,19 +25,32 @@ def rand_str(min_len=6, max_len=127):
 
 class Pyega3Test(unittest.TestCase):
     def test_load_credentials(self):
-        dict={"username":rand_str(),"password":rand_str(),"key":rand_str(),"client_secret":rand_str()}
+        
         with mock.patch('os.path.exists') as m:
             m.return_value = True
-            m_open = mock.mock_open(read_data=json.dumps(dict))
+
+            good_creds={"username":rand_str(),"password":rand_str(),"key":rand_str(),"client_secret":rand_str()}
+            m_open = mock.mock_open(read_data=json.dumps(good_creds))
             with mock.patch( "builtins.open", m_open ):                
-                credentials_file = "credentials.json"
-                result = pyega3.load_credentials(credentials_file)
-                m_open.assert_called_once_with(credentials_file)
+                good_credentials_file = "credentials.json"
+                result = pyega3.load_credentials(good_credentials_file)
+                m_open.assert_called_once_with(good_credentials_file)
                 self.assertEqual(len(result) , 4                     )
-                self.assertEqual(result[0]   , dict["username"]      )
-                self.assertEqual(result[1]   , dict["password"]      )
-                self.assertEqual(result[2]   , dict["client_secret"] )
-                self.assertEqual(result[3]   , dict["key"]           )    
+                self.assertEqual(result[0]   , good_creds["username"]      )
+                self.assertEqual(result[1]   , good_creds["password"]      )
+                self.assertEqual(result[2]   , good_creds["client_secret"] )
+                self.assertEqual(result[3]   , good_creds["key"]           ) 
+
+            bad_creds={"notusername":rand_str(),"password":rand_str(),"key":rand_str(),"client_secret":rand_str()}
+            with mock.patch( "builtins.open", mock.mock_open(read_data=json.dumps(bad_creds)) ):         
+                with self.assertRaises(SystemExit):
+                    bad_credentials_file = "bad_credentials.json"                
+                    result = pyega3.load_credentials(bad_credentials_file)
+
+            with mock.patch( "builtins.open", mock.mock_open(read_data="bad json") ):         
+                with self.assertRaises(SystemExit):
+                    bad_credentials_file = "bad_credentials.json"                
+                    result = pyega3.load_credentials(bad_credentials_file)
 
     @responses.activate    
     def test_get_token(self):        
@@ -254,6 +267,12 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(requests.exceptions.ConnectionError):
             pyega3.download_file_slice(bad_url, good_token, file_name, slice_start, slice_length)
 
+        with self.assertRaises(ValueError):
+            pyega3.download_file_slice(rand_str(), rand_str(), file_name, -1, slice_length)
+
+        with self.assertRaises(ValueError):
+            pyega3.download_file_slice(rand_str(), rand_str(), file_name, slice_start, -1)
+
 
     @mock.patch('os.remove')
     def test_merge_bin_files_on_disk(self, mocked_remove):        
@@ -268,11 +287,14 @@ class Pyega3Test(unittest.TestCase):
         merged_bytes = bytearray()
         def mock_write(buf): merged_bytes.extend(buf)
 
+        real_open = open
         def open_wrapper(filename, mode):       
             if filename == target_file_name:
                 file_object = mock.mock_open().return_value
                 file_object.write.side_effect = mock_write
-                return file_object                
+                return file_object
+            if filename not in files_to_merge:
+                return real_open(filename, mode)
             content = files_to_merge[filename] 
             length = len(content)
             buf_size = 65536
@@ -280,11 +302,9 @@ class Pyega3Test(unittest.TestCase):
             file_object.__iter__.return_value = [content[i:min(i+buf_size,length)] for i in range(0,length,buf_size)]
             return file_object        
         
-        for f in files_to_merge:      
-            open_patch = mock.patch('builtins.open', new=open_wrapper)
-            open_patch.start()
-        
-        pyega3.merge_bin_files_on_disk(target_file_name, files_to_merge)
+
+        with mock.patch('builtins.open', new=open_wrapper):
+            pyega3.merge_bin_files_on_disk(target_file_name, files_to_merge)
 
         mocked_remove.assert_has_calls( [mock.call(f) for f in files_to_merge.keys()] )
 
@@ -311,9 +331,75 @@ class Pyega3Test(unittest.TestCase):
         for md5, data in test_list:
             m_open = mock.mock_open(read_data=data)
             with mock.patch( "builtins.open", m_open ):                
-                credentials_file = "credentials.json"
                 result = pyega3.md5(rand_str())
                 self.assertEqual(md5, result)
+    
+    @responses.activate
+    def test_download_file(self):        
+        file_id = "EGAF00000000001"
+        url     = "https://ega.ebi.ac.uk:8051/elixir/data/files/{}".format(file_id)        
+        good_token = rand_str() 
+
+        mem             = virtual_memory().available
+        file_sz         = random.randint(1, mem//4)
+        file_name       = rand_str()
+        file_contents   = os.urandom(file_sz)
+
+        slices = {}
+        downloaded_file = bytearray()        
+        output_file_name = os.path.join( os.getcwd(), file_id, os.path.basename(file_name) )
+        
+        real_open = open
+        def open_wrapper(filename, mode):
+            if filename == output_file_name:
+                file_object = mock.mock_open().return_value
+                file_object.write.side_effect = lambda write_buf: downloaded_file.extend(write_buf)
+                return file_object
+            if not filename.endswith(".slice"): 
+                return real_open(filename, mode)
+            if filename not in slices :
+                slices[filename] = bytearray()
+            content     = slices[filename] 
+            print('-------------------------------------------------------------------')
+            print( type(content) )
+            print('-------------------------------------------------------------------')
+            content_len = len(content)
+            read_buf_sz = 65536
+            file_object = mock.mock_open(read_data=content).return_value
+            file_object.__iter__.return_value = [content[i:min(i+read_buf_sz,content_len)] for i in range(0,content_len,read_buf_sz)]
+            file_object.write.side_effect = lambda write_buf: slices[filename].extend(write_buf)
+            return file_object
+
+        def parse_ranges(s):
+            return tuple(map(int,re.match(r'^bytes=(\d+)-(\d+)$', s).groups()))
+
+        def request_callback(request):
+            auth_hdr = request.headers['Authorization']
+            if auth_hdr is None or auth_hdr != 'Bearer ' + good_token:
+                return ( 400, {}, json.dumps({"error_description": "invalid token"}) )
+
+            start, end = parse_ranges( request.headers['Range'] )
+            self.assertLess(start,end)                              
+            return ( 200, {}, file_contents[start:end+1] )
+                
+        responses.add_callback(
+            responses.GET, 
+            url,
+            callback=request_callback
+            )                
+        with mock.patch('builtins.open', new=open_wrapper): 
+             with mock.patch('os.makedirs', lambda path: None):
+                with mock.patch('os.path.exists', lambda path: path in slices):
+                    def os_stat_mock(fn):
+                        from collections import namedtuple
+                        X = namedtuple('X','st_size f1 f2 f3 f4 f5 f6 f7 f8 f9')
+                        sr = [None] * 10; sr[0]=len(slices[fn]); return X(*sr)
+                    with mock.patch('os.stat', os_stat_mock):
+                        check_sum = None
+                        pyega3.download_file( 
+                            good_token, file_id, file_name, file_sz, check_sum, 1, None, output_file=None )
+
+        self.assertEqual( file_contents, downloaded_file )
         
                     
 if __name__ == '__main__':

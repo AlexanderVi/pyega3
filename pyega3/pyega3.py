@@ -194,7 +194,7 @@ def merge_bin_files_on_disk(target_file_name, files_to_merge):
     with open(target_file_name,'wb') as target_file:
         for file_name in files_to_merge:
             with open(file_name,'rb') as f:
-                #print( file_name )
+                print( file_name )
                 shutil.copyfileobj(f, target_file, 65536)
             os.remove(file_name)
             
@@ -247,7 +247,7 @@ def download_file( token, file_id, file_name, file_size, check_sum, num_connecti
     print("Download starting [using {} connection(s)]...".format(num_connections))
 
     dir = os.path.dirname(output_file)
-    if( not os.path.exists(dir) and len(dir)>0 ): os.makedirs(dir)
+    if not os.path.exists(dir) and len(dir)>0 : os.makedirs(dir)
 
     chunk_len = math.ceil(file_size/num_connections)
 
