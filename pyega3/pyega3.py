@@ -194,7 +194,7 @@ def merge_bin_files_on_disk(target_file_name, files_to_merge):
     with open(target_file_name,'wb') as target_file:
         for file_name in files_to_merge:
             with open(file_name,'rb') as f:
-                print( file_name )
+                # print( file_name )
                 shutil.copyfileobj(f, target_file, 65536)
             os.remove(file_name)
             

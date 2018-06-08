@@ -299,7 +299,7 @@ class Pyega3Test(unittest.TestCase):
             length = len(content)
             buf_size = 65536
             file_object = mock.mock_open(read_data=content).return_value
-            file_object.__iter__.return_value = [content[i:min(i+buf_size,length)] for i in range(0,length,buf_size)]
+            file_object.__iter__.return_value = [content[i:min(i+buf_size,length)] for i in range(0,length,buf_size)]   
             return file_object        
         
 
@@ -335,33 +335,40 @@ class Pyega3Test(unittest.TestCase):
                 self.assertEqual(md5, result)
     
     @responses.activate
-    def test_download_file(self):        
+    @mock.patch('os.remove')
+    def test_download_file(self,mocked_remove):        
         file_id = "EGAF00000000001"
         url     = "https://ega.ebi.ac.uk:8051/elixir/data/files/{}".format(file_id)        
         good_token = rand_str() 
 
         mem             = virtual_memory().available
         file_sz         = random.randint(1, mem//4)
-        file_name       = rand_str()
+        file_name       = "resulting.file"
         file_contents   = os.urandom(file_sz)
+
+        import hashlib
+        m = hashlib.md5()
+        m.update(file_contents)
+        file_md5 = m.hexdigest()
 
         slices = {}
         downloaded_file = bytearray()        
-        output_file_name = os.path.join( os.getcwd(), file_id, os.path.basename(file_name) )
+        # output_file_name = os.path.join( os.getcwd(), file_id, os.path.basename(file_name) )
         
-        real_open = open
+        # real_open = open
         def open_wrapper(filename, mode):
-            if filename == output_file_name:
-                file_object = mock.mock_open().return_value
-                file_object.write.side_effect = lambda write_buf: downloaded_file.extend(write_buf)
-                return file_object
-            if not filename.endswith(".slice"): 
-                return real_open(filename, mode)
+            filename = os.path.basename(filename)
+            # if filename == output_file_name:
+            #     file_object = mock.mock_open().return_value
+            #     file_object.write.side_effect = lambda write_buf: downloaded_file.extend(write_buf)
+            #     return file_object
+            # if not filename.endswith(".slice"): 
+                # return real_open(filename, mode)
             if filename not in slices :
                 slices[filename] = bytearray()
-            content     = slices[filename] 
+            content     = bytes(slices[filename])
             print('-------------------------------------------------------------------')
-            print( type(content) )
+            print( "file={}, type={}, content={}".format(filename[:5]+"..." +filename[-30:], type(content), content[:10]) )
             print('-------------------------------------------------------------------')
             content_len = len(content)
             read_buf_sz = 65536
@@ -391,15 +398,23 @@ class Pyega3Test(unittest.TestCase):
              with mock.patch('os.makedirs', lambda path: None):
                 with mock.patch('os.path.exists', lambda path: path in slices):
                     def os_stat_mock(fn):
+                        fn=os.path.basename(fn)                        
                         from collections import namedtuple
                         X = namedtuple('X','st_size f1 f2 f3 f4 f5 f6 f7 f8 f9')
                         sr = [None] * 10; sr[0]=len(slices[fn]); return X(*sr)
                     with mock.patch('os.stat', os_stat_mock):
-                        check_sum = None
-                        pyega3.download_file( 
-                            good_token, file_id, file_name, file_sz, check_sum, 1, None, output_file=None )
+                        # with open("x.b", "wb") as ff:
+                        #     ff.write(b'123')
 
-        self.assertEqual( file_contents, downloaded_file )
+                        # with open(output_file_name, "wb") as fw:
+                        #     with open("x.b", "rb") as fr:
+                        #         for chunk in iter(lambda: fr.read(4096), b""):
+                        #             fw.write(chunk)
+
+                        pyega3.download_file( 
+                            good_token, file_id, file_name, file_sz, file_md5, 1, None, output_file=None )
+
+        self.assertEqual( file_contents, slices[file_name] )
         
                     
 if __name__ == '__main__':
