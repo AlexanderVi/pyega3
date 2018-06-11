@@ -1,20 +1,19 @@
 
 import os
+import re
 import sys
 import json
 import random
 import string
+import hashlib
 import requests
 import responses
-import re
 import unittest 
 from unittest import mock
 
 from urllib import parse
 from psutil import virtual_memory
-
-import struct
-import itertools
+from collections import namedtuple
 
 import pyega3.pyega3 as pyega3
 
@@ -344,32 +343,15 @@ class Pyega3Test(unittest.TestCase):
         mem             = virtual_memory().available
         file_sz         = random.randint(1, mem//4)
         file_name       = "resulting.file"
-        file_contents   = os.urandom(file_sz)
+        file_contents   = os.urandom(file_sz)         
+        file_md5        = hashlib.md5(file_contents).hexdigest()
 
-        import hashlib
-        m = hashlib.md5()
-        m.update(file_contents)
-        file_md5 = m.hexdigest()
-
-        slices = {}
-        downloaded_file = bytearray()        
-        # output_file_name = os.path.join( os.getcwd(), file_id, os.path.basename(file_name) )
-        
-        # real_open = open
+        slices = {}        
         def open_wrapper(filename, mode):
             filename = os.path.basename(filename)
-            # if filename == output_file_name:
-            #     file_object = mock.mock_open().return_value
-            #     file_object.write.side_effect = lambda write_buf: downloaded_file.extend(write_buf)
-            #     return file_object
-            # if not filename.endswith(".slice"): 
-                # return real_open(filename, mode)
             if filename not in slices :
                 slices[filename] = bytearray()
             content     = bytes(slices[filename])
-            print('-------------------------------------------------------------------')
-            print( "file={}, type={}, content={}".format(filename[:5]+"..." +filename[-30:], type(content), content[:10]) )
-            print('-------------------------------------------------------------------')
             content_len = len(content)
             read_buf_sz = 65536
             file_object = mock.mock_open(read_data=content).return_value
@@ -399,20 +381,11 @@ class Pyega3Test(unittest.TestCase):
                 with mock.patch('os.path.exists', lambda path: path in slices):
                     def os_stat_mock(fn):
                         fn=os.path.basename(fn)                        
-                        from collections import namedtuple
                         X = namedtuple('X','st_size f1 f2 f3 f4 f5 f6 f7 f8 f9')
                         sr = [None] * 10; sr[0]=len(slices[fn]); return X(*sr)
                     with mock.patch('os.stat', os_stat_mock):
-                        # with open("x.b", "wb") as ff:
-                        #     ff.write(b'123')
-
-                        # with open(output_file_name, "wb") as fw:
-                        #     with open("x.b", "rb") as fr:
-                        #         for chunk in iter(lambda: fr.read(4096), b""):
-                        #             fw.write(chunk)
-
                         pyega3.download_file( 
-                            good_token, file_id, file_name, file_sz, file_md5, 1, None, output_file=None )
+                            good_token, file_id, file_name, file_sz+16, file_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
 
         self.assertEqual( file_contents, slices[file_name] )
         
