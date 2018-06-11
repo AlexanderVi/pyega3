@@ -32,9 +32,9 @@ def load_credentials(filepath):
     return (creds['username'], creds['password'], creds['client_secret'], creds.get('key'))
 
 def get_token(credentials):
-    url = "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"    
-    
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}        
+    url = "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"
+
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}     
 
     (username, password, client_secret) = credentials
     data = { "grant_type"   : "password", 
@@ -217,14 +217,14 @@ def print_local_file_info( prefix_str, file, md5 ):
 def download_file( token, file_id, file_name, file_size, check_sum, num_connections, key, output_file=None ):
     """Download an individual file"""
 
-    if( key is not None ):
+    if key is not None:
         raise ValueError('key parameter: encrypted downloads are not supported yet')    
 
-    if( file_name.endswith(".gpg") ): 
+    if file_name.endswith(".gpg"): 
         print("GPG files are not supported")
         return
 
-    if( file_name.endswith(".cip") ): 
+    if file_name.endswith(".cip"): 
         file_name = file_name[:-len(".cip")]
 
     if output_file is None: 

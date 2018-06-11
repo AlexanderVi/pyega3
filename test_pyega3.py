@@ -210,6 +210,14 @@ class Pyega3Test(unittest.TestCase):
         bad_file_id = "EGAF00000000000"
         with self.assertRaises(requests.exceptions.ConnectionError):
             pyega3.get_file_name_size_md5(good_token, bad_file_id)
+
+        bad_file_id_2 = "EGAF00000000666"
+        responses.add(
+            responses.GET, 
+            "https://ega.ebi.ac.uk:8051/elixir/data/metadata/files/{}".format(bad_file_id_2),
+            json={"fileName": None, "checksum": None}, status=200)            
+        with self.assertRaises(RuntimeError):
+            pyega3.get_file_name_size_md5(good_token, bad_file_id_2)
   
     @responses.activate    
     def test_download_file_slice(self):
@@ -218,7 +226,7 @@ class Pyega3Test(unittest.TestCase):
         good_token = rand_str() 
 
         mem             = virtual_memory().available
-        file_length     = random.randint(1, mem//4)
+        file_length     = random.randint(1, mem//8)
         slice_start     = random.randint(0,file_length)
         slice_length    = random.randint(0,file_length-slice_start)
         file_name       = rand_str()
@@ -341,22 +349,22 @@ class Pyega3Test(unittest.TestCase):
         good_token = rand_str() 
 
         mem             = virtual_memory().available
-        file_sz         = random.randint(1, mem//4)
+        file_sz         = random.randint(1, mem//8)
         file_name       = "resulting.file"
         file_contents   = os.urandom(file_sz)         
         file_md5        = hashlib.md5(file_contents).hexdigest()
 
-        slices = {}        
+        mocked_files = {}        
         def open_wrapper(filename, mode):
             filename = os.path.basename(filename)
-            if filename not in slices :
-                slices[filename] = bytearray()
-            content     = bytes(slices[filename])
+            if filename not in mocked_files :
+                mocked_files[filename] = bytearray()
+            content     = bytes(mocked_files[filename])
             content_len = len(content)
             read_buf_sz = 65536
             file_object = mock.mock_open(read_data=content).return_value
             file_object.__iter__.return_value = [content[i:min(i+read_buf_sz,content_len)] for i in range(0,content_len,read_buf_sz)]
-            file_object.write.side_effect = lambda write_buf: slices[filename].extend(write_buf)
+            file_object.write.side_effect = lambda write_buf: mocked_files[filename].extend(write_buf)
             return file_object
 
         def parse_ranges(s):
@@ -378,16 +386,31 @@ class Pyega3Test(unittest.TestCase):
             )                
         with mock.patch('builtins.open', new=open_wrapper): 
              with mock.patch('os.makedirs', lambda path: None):
-                with mock.patch('os.path.exists', lambda path: path in slices):
+                with mock.patch('os.path.exists', lambda path: os.path.basename(path) in mocked_files):
                     def os_stat_mock(fn):
                         fn=os.path.basename(fn)                        
                         X = namedtuple('X','st_size f1 f2 f3 f4 f5 f6 f7 f8 f9')
-                        sr = [None] * 10; sr[0]=len(slices[fn]); return X(*sr)
+                        sr = [None] * 10; sr[0]=len(mocked_files[fn]); return X(*sr)
                     with mock.patch('os.stat', os_stat_mock):
                         pyega3.download_file( 
-                            good_token, file_id, file_name, file_sz+16, file_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+                            good_token, file_id, file_name+".cip", file_sz+16, file_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+                        self.assertEqual( file_contents, mocked_files[file_name] )
 
-        self.assertEqual( file_contents, slices[file_name] )
+                        pyega3.download_file( 
+                            good_token, file_id, file_name+".cip", file_sz+16, file_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+
+                        wrong_md5 = 0
+                        pyega3.download_file( 
+                            good_token, file_id, file_name+".cip", file_sz+16, wrong_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+
+                        mocked_remove.assert_has_calls( [mock.call(os.path.join( os.getcwd(), file_id, os.path.basename(f) )) for f in mocked_files.keys()] )
+
+                        
+
+        with self.assertRaises(ValueError):
+            pyega3.download_file( "", "", "", 0, 0, 1, "key", output_file=None ) 
+
+        pyega3.download_file( "", "", "test.gpg",  0, 0, 1, None, output_file=None ) 
         
                     
 if __name__ == '__main__':
