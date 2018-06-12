@@ -393,24 +393,66 @@ class Pyega3Test(unittest.TestCase):
                         sr = [None] * 10; sr[0]=len(mocked_files[fn]); return X(*sr)
                     with mock.patch('os.stat', os_stat_mock):
                         pyega3.download_file( 
-                            good_token, file_id, file_name+".cip", file_sz+16, file_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+                            # add 16 bytes to file size ( IV adjustment )
+                            good_token, file_id, file_name+".cip", file_sz+16, file_md5, 1, None, output_file=None ) 
                         self.assertEqual( file_contents, mocked_files[file_name] )
 
-                        pyega3.download_file( 
-                            good_token, file_id, file_name+".cip", file_sz+16, file_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+                        pyega3.download_file_retry( 
+                            good_token, file_id, file_name+".cip", file_sz+16, file_md5, 1, None, output_file=None ) 
 
                         wrong_md5 = 0
                         pyega3.download_file( 
-                            good_token, file_id, file_name+".cip", file_sz+16, wrong_md5, 1, None, output_file=None ) # 16 bytes to adjust for IV
+                            good_token, file_id, file_name+".cip", file_sz+16, wrong_md5, 1, None, output_file=None ) 
 
                         mocked_remove.assert_has_calls( [mock.call(os.path.join( os.getcwd(), file_id, os.path.basename(f) )) for f in mocked_files.keys()] )
 
-                        
-
         with self.assertRaises(ValueError):
-            pyega3.download_file( "", "", "", 0, 0, 1, "key", output_file=None ) 
+            pyega3.download_file_retry( "", "", "", 0, 0, 1, "key", output_file=None ) 
 
         pyega3.download_file( "", "", "test.gpg",  0, 0, 1, None, output_file=None ) 
+
+    @responses.activate    
+    def test_download_dataset(self): 
+
+        dataset = "EGAD00000000001"
+        responses.add(
+                responses.GET, 
+                "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets",
+                json=json.dumps([dataset]), status=200)
+        
+        file1_sz       = 4804928
+        file1_contents = os.urandom(file1_sz)
+        file1_md5      = hashlib.md5(file1_contents).hexdigest()
+
+        file2_sz       = 5991400
+        file2_contents = os.urandom(file2_sz)
+        file2_md5      = hashlib.md5(file2_contents).hexdigest()
+
+        files = [
+        {
+            "checksum": file1_md5,
+            "datasetId": dataset,
+            "fileStatus": "available",
+            "fileId": "EGAF00000000001",
+            "checksumType": "MD5",
+            "fileSize": file1_sz,
+            "fileName": "EGAZ00000000001/ENCFF000001.bam"
+        },
+        {
+            "checksum": file12_md5,
+            "datasetId": dataset,
+            "fileStatus": "available",
+            "fileId": "EGAF00000000002",
+            "checksumType": "MD5",
+            "fileSize": file2_sz,
+            "fileName": "EGAZ00000000002/ENCFF000002.bam"
+        } ]                     
+        responses.add_callback(
+            responses.GET,
+            "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets/{}/files".format(dataset)
+            json=json.dumps([files]), status=200)
+
+        
         
                     
 if __name__ == '__main__':
