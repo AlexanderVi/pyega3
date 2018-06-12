@@ -426,6 +426,9 @@ class Pyega3Test(unittest.TestCase):
 
         files = [
         {
+            "fileStatus": "not_available"
+        },
+        {
             "checksum": file1_md5,
             "datasetId": good_dataset,
             "fileStatus": "available",
@@ -454,10 +457,10 @@ class Pyega3Test(unittest.TestCase):
                     self.assertEqual( 0, mocked_dfr.call_count )
                 
                     pyega3.download_dataset( creds, good_dataset, num_connections, None, None )
-                    self.assertEqual( len(files), mocked_dfr.call_count )
+                    self.assertEqual( len(files)-1, mocked_dfr.call_count )
 
                     mocked_dfr.assert_has_calls( 
-                        [mock.call('token', f['fileId'], f['fileName'], f['fileSize'],f['checksum'],num_connections,None,None) for f in files] )
+                        [mock.call('token', f['fileId'], f['fileName'], f['fileSize'],f['checksum'],num_connections,None,None) for f in files if f["fileStatus"]=="available"] )
 
 if __name__ == '__main__':
     unittest.main(exit=False)
