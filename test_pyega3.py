@@ -411,10 +411,10 @@ class Pyega3Test(unittest.TestCase):
         pyega3.download_file( "", "", "test.gpg",  0, 0, 1, None, output_file=None ) 
 
     @responses.activate    
-    def test_download_dataset(self):         
+    @mock.patch("pyega3.pyega3.download_file_retry")
+    def test_download_dataset(self, mocked_dfr):         
 
-        dataset = "EGAD00000000001"
-        pyega3.api_list_authorized_datasets = lambda token: [dataset]        
+        good_dataset = "EGAD00000000001"               
         
         file1_sz       = 4804928
         file1_contents = os.urandom(file1_sz)
@@ -427,7 +427,7 @@ class Pyega3Test(unittest.TestCase):
         files = [
         {
             "checksum": file1_md5,
-            "datasetId": dataset,
+            "datasetId": good_dataset,
             "fileStatus": "available",
             "fileId": "EGAF00000000001",
             "checksumType": "MD5",
@@ -436,7 +436,7 @@ class Pyega3Test(unittest.TestCase):
         },
         {
             "checksum": file2_md5,
-            "datasetId": dataset,
+            "datasetId": good_dataset,
             "fileStatus": "available",
             "fileId": "EGAF00000000002",
             "checksumType": "MD5",
@@ -444,17 +444,20 @@ class Pyega3Test(unittest.TestCase):
             "fileName": "EGAZ00000000002/ENCFF000002.bam"
         } ]                     
               
-        with mock.patch("pyega3.pyega3.get_token", lambda creds: rand_str() ):
-            with mock.patch("pyega3.pyega3.api_list_files_in_dataset", lambda token, dataset_id: files ):
-                with mock.patch("pyega3.pyega3.download_file_retry") as mocked_dfr:
+        with mock.patch("pyega3.pyega3.get_token", lambda creds: 'token' ):
+            with mock.patch("pyega3.pyega3.api_list_authorized_datasets", lambda token: [good_dataset]):        
+                with mock.patch("pyega3.pyega3.api_list_files_in_dataset", lambda token, dataset_id: files ):                
                     creds={"username":rand_str(),"password":rand_str(),"client_secret":rand_str()}
                     num_connections = 1
-                    pyega3.download_dataset( creds, dataset, num_connections, None, None )
+                    bad_dataset = "EGAD00000000666"
+                    pyega3.download_dataset( creds, bad_dataset, num_connections, None, None )
+                    self.assertEqual( 0, mocked_dfr.call_count )
                 
-                    # self.assertEqual( len(files), mocked_dfr.return_value.call_count )
+                    pyega3.download_dataset( creds, good_dataset, num_connections, None, None )
+                    self.assertEqual( len(files), mocked_dfr.call_count )
 
-                    mocked_dfr.return_value.assert_has_calls( 
-                        [mock.call(f['fileId'], f['fileName'], f['fileSize'],f['checksum'],num_connections,None,None) for f in files] )
+                    mocked_dfr.assert_has_calls( 
+                        [mock.call('token', f['fileId'], f['fileName'], f['fileSize'],f['checksum'],num_connections,None,None) for f in files] )
 
 if __name__ == '__main__':
     unittest.main(exit=False)
