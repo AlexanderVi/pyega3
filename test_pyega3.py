@@ -8,7 +8,7 @@ import string
 import hashlib
 import requests
 import responses
-import unittest 
+import unittest
 from unittest import mock
 
 from urllib import parse
@@ -23,6 +23,7 @@ def rand_str(min_len=6, max_len=127):
     return random_string(random.randint(1, max_len))
 
 class Pyega3Test(unittest.TestCase):
+    @unittest.skip
     def test_load_credentials(self):
         
         with mock.patch('os.path.exists') as m:
@@ -51,6 +52,7 @@ class Pyega3Test(unittest.TestCase):
                     bad_credentials_file = "bad_credentials.json"                
                     result = pyega3.load_credentials(bad_credentials_file)
 
+    @unittest.skip
     @responses.activate    
     def test_get_token(self):        
         url  =  "https://ega.ebi.ac.uk:8443/ega-openid-connect-server/token"
@@ -81,6 +83,7 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(SystemExit):
             pyega3.get_token(bad_credentials)                                
 
+    @unittest.skip
     @responses.activate    
     def test_api_list_authorized_datasets(self):        
         url = "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets"
@@ -111,7 +114,7 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(requests.exceptions.HTTPError):
             pyega3.api_list_authorized_datasets(bad_token)
 
-    
+    @unittest.skip
     @responses.activate    
     def test_api_list_files_in_dataset(self): 
 
@@ -173,6 +176,7 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(SystemExit):
             pyega3.api_list_files_in_dataset(good_token, bad_dataset)
 
+    @unittest.skip
     @responses.activate    
     def test_get_file_name_size_md5(self):      
 
@@ -219,6 +223,7 @@ class Pyega3Test(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             pyega3.get_file_name_size_md5(good_token, bad_file_id_2)
   
+    @unittest.skip
     @responses.activate    
     def test_download_file_slice(self):
 
@@ -281,6 +286,7 @@ class Pyega3Test(unittest.TestCase):
             pyega3.download_file_slice(rand_str(), rand_str(), file_name, slice_start, -1)
 
 
+    @unittest.skip
     @mock.patch('os.remove')
     def test_merge_bin_files_on_disk(self, mocked_remove):        
         mem = virtual_memory().available        
@@ -341,6 +347,7 @@ class Pyega3Test(unittest.TestCase):
                 result = pyega3.md5(rand_str())
                 self.assertEqual(md5, result)
     
+    @unittest.skip
     @responses.activate
     @mock.patch('os.remove')
     def test_download_file(self,mocked_remove):        
@@ -412,13 +419,12 @@ class Pyega3Test(unittest.TestCase):
         pyega3.download_file( "", "", "test.gpg",  0, 0, 1, None, output_file=None ) 
 
     @responses.activate    
-    def test_download_dataset(self): 
+    def test_download_dataset(self):         
+
+        pyega3.get_token = lambda creds: rand_str()
 
         dataset = "EGAD00000000001"
-        responses.add(
-                responses.GET, 
-                "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets",
-                json=json.dumps([dataset]), status=200)
+        pyega3.api_list_authorized_datasets = lambda token: [dataset]        
         
         file1_sz       = 4804928
         file1_contents = os.urandom(file1_sz)
@@ -439,7 +445,7 @@ class Pyega3Test(unittest.TestCase):
             "fileName": "EGAZ00000000001/ENCFF000001.bam"
         },
         {
-            "checksum": file12_md5,
+            "checksum": file2_md5,
             "datasetId": dataset,
             "fileStatus": "available",
             "fileId": "EGAF00000000002",
@@ -447,13 +453,21 @@ class Pyega3Test(unittest.TestCase):
             "fileSize": file2_sz,
             "fileName": "EGAZ00000000002/ENCFF000002.bam"
         } ]                     
-        responses.add_callback(
-            responses.GET,
-            "https://ega.ebi.ac.uk:8051/elixir/data/metadata/datasets/{}/files".format(dataset)
-            json=json.dumps([files]), status=200)
+        pyega3.api_list_files_in_dataset = lambda token, dataset_id: files        
 
+        mocked_calls_made = []
+        def mock_download_file_retry(token,file_id,file_name,file_size,check_sum,num_connections,key,output_file=None):
+            mocked_calls_made.append( (file_id,file_name,file_size,check_sum) )
+
+        pyega3.download_file_retry = mock_download_file_retry
+        creds={"username":rand_str(),"password":rand_str(),"client_secret":rand_str()}
+        pyega3.download_dataset( creds, dataset, 1, None, None )
         
+        self.assertEqual(len(files),len(mocked_calls_made))
+        for i in range(len(mocked_calls_made)):
+            self.assertEqual( mocked_calls_made[i], (files[i]['fileId'], files[i]['fileName'], files[i]['fileSize'],files[i]['checksum']))
         
+               
                     
 if __name__ == '__main__':
     unittest.main(exit=False)
