@@ -225,7 +225,7 @@ class Pyega3Test(unittest.TestCase):
         good_token = rand_str() 
 
         mem             = virtual_memory().available
-        file_length     = random.randint(1, mem//16)
+        file_length     = random.randint(1, mem//64)
         slice_start     = random.randint(0,file_length)
         slice_length    = random.randint(0,file_length-slice_start)
         file_name       = rand_str()
@@ -284,9 +284,9 @@ class Pyega3Test(unittest.TestCase):
     def test_merge_bin_files_on_disk(self, mocked_remove):        
         mem = virtual_memory().available        
         files_to_merge = {
-            'f1.bin' : os.urandom(random.randint(1, mem//16)), 
-            'f2.bin' : os.urandom(random.randint(1, mem//16)), 
-            'f3.bin' : os.urandom(random.randint(1, mem//16)), 
+            'f1.bin' : os.urandom(random.randint(1, mem//64)), 
+            'f2.bin' : os.urandom(random.randint(1, mem//64)), 
+            'f3.bin' : os.urandom(random.randint(1, mem//64)), 
         }
         target_file_name = "merged.file"
 
@@ -348,7 +348,7 @@ class Pyega3Test(unittest.TestCase):
         good_token = rand_str() 
 
         mem             = virtual_memory().available
-        file_sz         = random.randint(1, mem//16)
+        file_sz         = random.randint(1, mem//64)
         file_name       = "resulting.file"
         file_contents   = os.urandom(file_sz)         
         file_md5        = hashlib.md5(file_contents).hexdigest()
