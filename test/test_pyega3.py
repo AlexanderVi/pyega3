@@ -403,7 +403,9 @@ class Pyega3Test(unittest.TestCase):
                         pyega3.download_file( 
                             good_token, file_id, file_name+".cip", file_sz+16, wrong_md5, 1, None, output_file=None ) 
 
-                        mocked_remove.assert_has_calls( [mock.call(os.path.join( os.getcwd(), file_id, os.path.basename(f) )) for f in mocked_files.keys()] )
+                        mocked_remove.assert_has_calls( 
+                            [mock.call(os.path.join( os.getcwd(), file_id, os.path.basename(f) )) for f in mocked_files.keys()],
+                            any_order=True )
 
         with self.assertRaises(ValueError):
             pyega3.download_file_retry( "", "", "", 0, 0, 1, "key", output_file=None ) 
