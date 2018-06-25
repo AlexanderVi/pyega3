@@ -15,4 +15,11 @@ after_success:
     - coverage report
     - coveralls
     - python setup.py sdist
-    - twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+deploy:
+  provider: pypi
+  server: https://test.pypi.org/simple/
+  user: ega
+  password: confirmationnot!
+  on:
+    tags: true
+
