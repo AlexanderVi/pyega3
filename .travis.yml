@@ -17,7 +17,7 @@ after_success:
     - python setup.py sdist
 deploy:
   provider: pypi
-  server: https://test.pypi.org/simple/
+  server: https://test.pypi.org/legacy/
   user: ega
   password: confirmationnot!
   on:
