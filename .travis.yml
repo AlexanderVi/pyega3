@@ -19,7 +19,7 @@ deploy:
   provider: pypi
   server: https://test.pypi.org/legacy/
   user: ega
-  password: confirmationnot!
+  password: UEhbGQJ+zatXA0uH6AggOk+Ds5oolSFXCsS5qtnfxwgPjn0tMP099WIg+ABc2JYz1LJIprkud1HNdELNOxcLG87T8zkKmAZKkRVkTFx8a70XU2dCetbsWrHwdYb5L79y0ikCrE5UwfLAV7IxcX1udno236n9UfgsZd9Ft9swfNt2XzXhDuq6RnmnC7e+/XWdCVfESQst1jE0hb1xMM9YtZY6ehK2BAEv4ib7YPaSN35vFpcKoC2xoZmp7l7fwYHBF+jseDyGhRDGYa5QAw5rtrX2n2NsHSHRLKjvByJ0R2GvltJfo5AU/kiQgvF/bU2JN2ctRNI1tYpFTEVImK/W5nwJ8PR/yZ3ZUkfwYlN6owRQNXJH/TZvAf7Qw6s51dyZo5sgb4M6oDGLjEVCwTSC+gc1uDMHTa/vd6tXEI6IqZn5WRGRLXV93YxVjkTdMyK8K9PC2Flz7hLzXyzMacfAEYOWZW67d4T9yRkQup9ReGNQ4EmRgaFJyeZkCa3Yu5cHP5+zq+87/sjZxLu72OeHnYlcP7uO1VWfzfmi49tjB2xduhuKXDn1Zvfin/IXV2FMBCj+hmny+eMv7DaLTSam15sDJBtIa2bQb1HtpoZjStY25TtNdHLCaBBnbui3fI0VpXj2Nyqmnq97YQFS99KtiuFmVSYSmTenAAbY46dD77g=
   on:
     tags: true
 
