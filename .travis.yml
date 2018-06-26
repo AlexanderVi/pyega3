@@ -1,26 +1,25 @@
 sudo: false
 language: python
 python:
-    - "3.4"
-env: 
-    - TEST_SUITE='coverage run --source=pyega3 setup.py test'
-install: 
-    - pip install -r requirements.txt
-    - pip install python-coveralls
-script: 
-    - echo $TEST_SUITE
-    - echo $TEST_SUITE > test.sh
-    - bash test.sh
-after_success: 
-    - coverage report
-    - coveralls
-    - python setup.py sdist
+- '3.4'
+env:
+- TEST_SUITE='coverage run --source=pyega3 setup.py test'
+install:
+- pip install -r requirements.txt
+- pip install python-coveralls
+script:
+- echo $TEST_SUITE
+- echo $TEST_SUITE > test.sh
+- bash test.sh
+after_success:
+- coverage report
+- coveralls
+- python setup.py sdist
 deploy:
   provider: pypi
   server: https://test.pypi.org/legacy/
   user: ega
   password:
-    secure: UEhbGQJ+zatXA0uH6AggOk+Ds5oolSFXCsS5qtnfxwgPjn0tMP099WIg+ABc2JYz1LJIprkud1HNdELNOxcLG87T8zkKmAZKkRVkTFx8a70XU2dCetbsWrHwdYb5L79y0ikCrE5UwfLAV7IxcX1udno236n9UfgsZd9Ft9swfNt2XzXhDuq6RnmnC7e+/XWdCVfESQst1jE0hb1xMM9YtZY6ehK2BAEv4ib7YPaSN35vFpcKoC2xoZmp7l7fwYHBF+jseDyGhRDGYa5QAw5rtrX2n2NsHSHRLKjvByJ0R2GvltJfo5AU/kiQgvF/bU2JN2ctRNI1tYpFTEVImK/W5nwJ8PR/yZ3ZUkfwYlN6owRQNXJH/TZvAf7Qw6s51dyZo5sgb4M6oDGLjEVCwTSC+gc1uDMHTa/vd6tXEI6IqZn5WRGRLXV93YxVjkTdMyK8K9PC2Flz7hLzXyzMacfAEYOWZW67d4T9yRkQup9ReGNQ4EmRgaFJyeZkCa3Yu5cHP5+zq+87/sjZxLu72OeHnYlcP7uO1VWfzfmi49tjB2xduhuKXDn1Zvfin/IXV2FMBCj+hmny+eMv7DaLTSam15sDJBtIa2bQb1HtpoZjStY25TtNdHLCaBBnbui3fI0VpXj2Nyqmnq97YQFS99KtiuFmVSYSmTenAAbY46dD77g=
+    secure: KntyKg8WOiqlF5GF8jDBLM2VYtdjzrY+nVFmil1hOVmDfJuSsTYtyHKJhLD/F+l20OpNO0t2Pv8dCUNCW3y1t7Ep7yLtTDGSLHsvQOQINuSFNZmo3EsjH6zEYgxGX6CulGbkapZJXoEKt0ZFzaPXI5ZJESyUvoDmc5FOBT0luVitBVEIPVqhWOvCOi64ZpTIsaIdG+1wcTs5o9TUBo3XiIN/KZvy7SkjeR/iX4JEeKgnvjd4X4r3UR0fEk/T4giOLKb8UeqR9v7CKJdZYOx1tcnQ7EAgiGV18nfn4l3xKwClhBB332P8RK6gRlwaLLJg5aZS/NgIMW5x2LLQvLWc53TYEAWLPs0Kgn1C1FJq8CuaIDVFw6/PecUl2LkTOeWlBHMx4Aawe3Qus1jNGc+hM8VB664pwLq0WH4hfVvUViuk1dm0C9ZSPOocLMJp3DkqKUrGefZShkGX3e0TiWh8cTwF7zHKz0/uOFGhyfBySyiU5tf0kKfOBVAkQ1THGlrFON4oieQMz4GL3JHQDHl+v6YWkvlak2VZ/0F4pQmOXSAn1JVMYwryeB3m5rw6Mj11Jd0gKJNA4qOwvfQhKf05Kb+wObAD3olGSeAKAgTWIMHPGLXxrZz8o2yc9WbKJJUN/9ktLqOwhOBzORVGDxUQdm+P39+biD6AV0TJsL0pzXk=
   on:
     tags: true
-
